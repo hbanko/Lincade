@@ -1,0 +1,287 @@
+#!/bin/bash
+#
+#---------------------------------------------------------------------------------
+#-- Copyright Kororaa Project (http://kororaa.org)				--
+#-- Copyleft :) Kororaa Project							--
+#--										--
+#-- Kororaa Date and Time System Tool						--
+#-- Created by Matthew Oliver, Christopher Smart				--
+#--										--
+#-- Date: 21st July 2006							--
+#-- Version: 0.3								--
+#-- Licence: GPL2								--
+#--										--
+#-- Program: setdatetime							--
+#-- Usage: "setdatetime"							--
+#-- Purpose: This is the tool that sets the system date and time		--
+#---------------------------------------------------------------------------------
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+#
+#---------------------------------------------------------------------------------
+#
+# History #
+#----------------------------------------------------------
+# v0.3.1 - 31/01/2007
+#	* Modified for use in Lincade System
+#	* Language Enabled
+#	* Original Source commented out
+#	* Version aquired from http://kororaa.org/files/tools/setdatetime
+# v0.3 - 21/07/2006
+#	* Updated script so it uses replaceLines script and libkororaa
+# v0.2 - 13/03/2006
+#	* Added the ability to choose between UTC and Local time.
+# v0.1 - 01/03/2006
+#       * Seperated from gensetup.
+#----------------------------------------------------------
+
+#source libraries
+source "/usr/bin/libkororaa"
+
+### Lincade Changed
+DIALOG=${DIALOG:-dialog}
+
+
+language=`cat /home/mame/.lincade/.language`
+language=${language:-2}
+	case $language in
+		1)	#German Menu Text
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+			right_time="Is this the right time?"
+			date_title="Date"
+			calendar_title="Calendar"
+			select_date="Select date (use tab, up and down arrow keys)"
+			time_title="Time"
+			clock_type="Clock Type"
+			error_msg="ERROR"
+			invalid_date="You entered an invalid date."
+		;;
+		2)	#English Menu Text
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+			right_time="Is this the right time?"
+			date_title="Date"
+			calendar_title="Calendar"
+			select_date="Select date (use tab, up and down arrow keys)"
+			time_title="Time"
+			clock_type="Clock Type"
+			error_msg="ERROR"
+			invalid_date="You entered an invalid date."
+		;;
+		3)	#French Menu Text
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+			right_time="Is this the right time?"
+			date_title="Date"
+			calendar_title="Calendar"
+			select_date="Select date (use tab, up and down arrow keys)"
+			time_title="Time"
+			clock_type="Clock Type"
+			error_msg="ERROR"
+			invalid_date="You entered an invalid date."
+		;;
+		*)
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+			right_time="Is this the right time?"
+			date_title="Date"
+			calendar_title="Calendar"
+			select_date="Select date (use tab, up and down arrow keys)"
+			time_title="Time"
+			clock_type="Clock Type"
+			error_msg="ERROR"
+			invalid_date="You entered an invalid date."
+		;;
+	esac
+
+#Global Variables
+day=0
+month=0
+year=0
+hour=0
+minute=0
+second=0
+clockType=""
+
+#Locations
+CLOCK="/etc/conf.d/clock"
+
+
+function setDate()
+{
+	clockType=`cat /etc/conf.d/clock |grep "CLOCK=\"" |awk -F '"' '{print $2}'`
+### Lincade Changed
+	#dialog --backtitle "$TITLE" --title "Date" --yesno "Clock Type:        $clockType \nDate (yyyy/mm/dd): `date +%Y/%m/%d`\nTime (HH:MM:SS):   `date +%H:%M:%S`\n\nIs this the right time?" 10 40
+	$DIALOG --backtitle "$TITLE" --title "$date_title" --yesno "$clock_type:        $clockType \nDate (yyyy/mm/dd): `date +%Y/%m/%d`\nTime (HH:MM:SS):   `date +%H:%M:%S`\n\n$right_time" 10 40
+	
+	case "$?" in
+		#0) menu 2 ;;
+		1) changeDate ;;
+	esac
+
+}
+
+function askDate()
+{
+### Lincade Changed
+	#dialog --backtitle "$TITLE" --title "Calendar" \
+	#--calendar "Select date (use tab, up and down arrow keys):" 3 50 \
+	#2>date.res
+	$DIALOG --backtitle "$TITLE" --title "$calendar_title" \
+	--calendar "$select_date:" 3 50 \
+	2>date.res
+
+	result=$?
+
+### Lincade Changed
+	#dateResult=(`cat date.res |sed "s/\// /g"`)
+	dateResult=(`awk '{ field = $NF }; END{ print field }' date.res | sed "s/\// /g"`)
+	
+	day="${dateResult[0]}"
+	month="${dateResult[1]}"
+	year="${dateResult[2]}"
+	
+	rm -f date.res
+	return $result
+}
+
+function askTime()
+{
+### Lincade Changed
+	#dialog --backtitle "$TITLE" --title "Time" \
+	#--timebox "Enter time:" 2 40 \
+	#2>time.res
+	$DIALOG --backtitle "$TITLE" --title "$time_tile" \
+	--timebox "Enter time:" 2 40 \
+	2>time.res
+
+	result=$?
+
+### Lincade Changed
+	#timeResult=(`cat time.res |sed "s/:/ /g"`)
+	timeResult=(`awk '{ field = $NF }; END{ print field }' time.res | sed "s/:/ /g"`)
+	
+	hour="${timeResult[0]}"
+	minute="${timeResult[1]}"
+	second="${timeResult[2]}"
+
+	rm -f time.res
+	return $result
+}
+
+function askdatetype()
+{
+	if [ "$clockType" == "UTC" ]
+	then
+		lstatus="off"
+		ustatus="on"
+	else
+		lstatus="on"
+		ustatus="off"
+	fi
+
+### Lincade Changed
+	#dialog --backtitle "$TITLE" --title "Clock Type" \
+	#--radiolist "Clock Type:" 0 0 0 "local" "" $lstatus "UTC" "" $ustatus 2>result.res
+	$DIALOG --backtitle "$TITLE" --title "$clock_type" \
+	--radiolist "$clock_type:" 0 0 0 "local" "" $lstatus "UTC" "" $ustatus 2>result.res
+	
+	returnval=$?
+	if [ "$returnval" == "0" ]
+	then
+### Lincade Changed
+		#clockType="`cat result.res`"
+		clockType="$(awk '{ field = $NF }; END{ print field }' result.res)"
+		rm -f result.res
+		return $returnval
+	else
+		if [ -e result.res ]
+		then
+			rm -f result.res
+		fi
+
+		return $returnval
+	fi
+
+
+}
+
+function changeDate()
+{
+	askDate
+	if [ "$?" == "1" ]
+	then
+		setDate
+	else
+		askTime
+		
+		if [ "$?" == "1" ]
+		then
+			changeDate
+		else
+			askdatetype
+			if [ "$?" == "1" ]
+			then
+				changeDate
+			else
+				#Change to UTC/Local
+				check_replace_append "CLOCK=\"" "CLOCK=\"$clockType\"" "$CLOCK" "" 0 "#"				
+
+				newdate="$month$day$hour$minute$year.$second"
+	
+				date $newdate >/dev/null 2>/dev/null
+				
+				if [ "$?" != "0" ]
+				then
+### Lincade Changed
+					#dialog --backtitle "$TITLE" --title "ERROR" --msgbox "You entered an invalid date." 10 50
+					$DIALOG --backtitle "$TITLE" --title "$error_msg" --msgbox "$invalid_date" 10 50
+					setDate
+				else
+					setDate
+				fi
+			fi
+		fi
+	fi
+	
+}
+
+#Main Section
+if [ -z "$1" ]
+then
+### Lincade Changed
+	#TITLE="Kororaa"
+	TITLE="Lincade Borrowed - Kororaa - SetDateTime"
+else
+	TITLE="$1"
+fi
+
+checkUser 
+
+if [ "$?" == "1" ]
+then
+	#error
+### Lincade Changed
+	#dialog --backtitle "$TITLE" --title "Permissions Error" \
+	#	--msgbox "You must be root to run this script." 10 60
+	$DIALOG --backtitle "$TITLE" --title "$permissions" \
+		--msgbox "$root_required" 10 60
+	clear
+	exit 1
+fi
+
+setDate
+clear
+exit 0

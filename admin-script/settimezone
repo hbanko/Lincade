@@ -1,0 +1,231 @@
+#!/bin/bash
+#
+#---------------------------------------------------------------------------------
+#-- Copyright Kororaa Project (http://kororaa.org)				--
+#-- Copyleft :) Kororaa Project							--
+#--										--
+#-- Kororaa Timezone Tool							--
+#-- Created by Matthew Oliver, Christopher Smart				--
+#--										--
+#-- Date: 21st July 2006							--
+#-- Version: 0.2								--
+#-- Licence: GPL2								--
+#--										--
+#-- Program: settimezone							--
+#-- Usage: "settimezone"							--
+#-- Purpose: This script sets the timezone.					--
+#---------------------------------------------------------------------------------
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+#
+#---------------------------------------------------------------------------------
+#
+# History #
+#----------------------------------------------------------
+# v0.2.1 - 31/01/2007
+#	* Modified for use in Lincade System
+#	* Language Enabled
+#	* Original Source commented out
+#	* Version aquired from http://kororaa.org/files/tools/settimezone
+# v0.2 - 21/07/2006
+#	* Added libkororaa for uid check
+# v0.1 - 01/03/2006
+#       * Seperated from gensetup.
+#----------------------------------------------------------
+
+#source libraries
+source "/usr/bin/libkororaa"
+
+### Lincade Changed
+DIALOG=${DIALOG:-dialog}
+
+
+language=`cat /home/mame/.lincade/.language`
+language=${language:-2}
+	case $language in
+		1)	#German Menu Text
+			time_zone="Time Zone"
+			choose_country="Choose a country (space bar selects)"
+			choose_city="Choose a city/location (space bar selects)"
+			set_time_zone="Set Time Zone"
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+		;;
+		2)	#English Menu Text
+			time_zone="Time Zone"
+			choose_country="Choose a country (space bar selects)"
+			choose_city="Choose a city/location (space bar selects)"
+			set_time_zone="Set Time Zone"
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+		;;
+		3)	#French Menu Text
+			time_zone="Time Zone"
+			choose_country="Choose a country (space bar selects)"
+			choose_city="Choose a city/location (space bar selects)"
+			set_time_zone="Set Time Zone"
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+		;;
+		*)
+			time_zone="Time Zone"
+			choose_country="Choose a country (space bar selects)"
+			choose_city="Choose a city/location (space bar selects)"
+			set_time_zone="Set Time Zone"
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+		;;
+	esac
+
+#Global Variables
+TIMEZONE_BASE="/usr/share/zoneinfo"
+output_location="/dev/null"
+
+function askTimeZoneCountry()
+{
+	countryList=(` ls -l $TIMEZONE_BASE |grep drw |awk '{print $9}' |grep -v right |grep -v posix `)
+	end=0
+	needinput=yes
+	while [ ! -z "$needinput" ]; do
+		i=0
+		temp=0
+		menulist=""
+		numCountry=${#countryList[*]}
+	
+		while [ "$i" -lt "$numCountry" ]; do
+			let "temp=i+1"
+			if [ $temp -eq 1 ]
+			then 
+				menulist="$menulist $temp  ${countryList[$i]} on"
+			else
+				menulist="$menulist $temp  ${countryList[$i]} off"
+			fi
+			let "i+=1"
+		done
+	
+		#dirty hack
+		umount /proc &> $output_location
+### Lincade Changed
+		#echo "$menulist" |xargs dialog --backtitle "$TITLE" --title "Time Zone" --radiolist "Choose a country (space bar selects):" 16 60 9 2> result.res
+		echo "$menulist" |xargs $DIALOG --backtitle "$TITLE" --title "$time_zone" --radiolist "$choose_country:" 16 60 9 2> result.res
+		tempResult=$?
+		mount /proc &> $output_location
+		if [ "$tempResult" == "0" ]
+		then
+### Lincade Changed
+			#index=` cat result.res `
+			index="$(awk '{ field = $NF }; END{ print field }' result.res)"
+			let "index-=1"
+			countryFolder=${countryList[$index]}
+			unset needinput
+		else
+			end=1
+			unset needinput
+		fi
+		
+		if [ -e result.res ]
+		then
+			rm -f result.res
+		fi
+	done
+	
+	if [ "$end" == "0" ]
+	then
+		askTimeZoneCity
+	fi
+}
+
+function askTimeZoneCity()
+{
+	cityList=(` ls -l $TIMEZONE_BASE/$countryFolder |grep -v total |awk '{print $9}' `)
+	end=0
+	needinput=yes
+	while [ ! -z "$needinput" ]; do
+		i=0
+		temp=0
+		menulist=""
+		numCity=${#cityList[*]}
+	
+		while [ "$i" -lt "$numCity" ]; do
+			let "temp=i+1"
+			if [ $temp -eq 1 ]
+			then 
+				menulist="$menulist $temp  ${cityList[$i]} on"
+			else
+				menulist="$menulist $temp  ${cityList[$i]} off"
+			fi
+			let "i+=1"
+		done
+		#dirty hack
+		umount /proc &> $output_location
+### Lincade Changed
+		#echo "$menulist" |xargs dialog --backtitle "$TITLE" --title "Time zone" --radiolist "Choose a city/location (space bar selects):" 15 60 8 2> result.res
+		echo "$menulist" |xargs $DIALOG --backtitle "$TITLE" --title "$time_zone" --radiolist "$choose_city:" 15 60 8 2> result.res
+		tempResult=$?
+		mount /proc &> $output_location
+		if [ "$tempResult" == "0" ]
+		then
+### Lincade Changed
+			#index=` cat result.res `
+			index="$(awk '{ field = $NF }; END{ print field }' result.res)"
+			let "index-=1"
+			cityVal=${cityList[$index]}
+			unset needinput
+		
+		else
+			end=1
+			unset needinput
+		fi
+		
+		if [ -e result.res ]
+		then
+			rm -f result.res
+		fi
+	done
+
+	if [ "$end" == "0" ]
+	then
+		ln -sf $TIMEZONE_BASE/$countryFolder/$cityVal /etc/localtime
+	else
+		askTimeZoneCountry
+	fi
+}
+
+#Main Section
+if [ -z "$1" ]
+then
+### Lincade Changed
+	#TITLE="Kororaa"
+	TITLE="Lincade Borrowed - Kororaa - $set_time_zone"
+else
+	TITLE="$1"
+fi
+
+checkUser 
+
+if [ "$?" == "1" ]
+then
+	#error
+### Lincade Changed
+	#dialog --backtitle "$TITLE" --title "Permissions Error" \
+	#	--msgbox "You must be root to run this script." 10 60
+	$DIALOG --backtitle "$TITLE" --title "$permissions" \
+		--msgbox "$root_required" 10 60
+	clear
+	exit 1
+fi
+
+askTimeZoneCountry
+clear
+exit 0

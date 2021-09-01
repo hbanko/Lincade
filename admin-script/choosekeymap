@@ -1,0 +1,196 @@
+#!/bin/bash
+#
+#---------------------------------------------------------------------------------
+#-- Copyright Kororaa Project (http://kororaa.org)				--
+#-- Copyleft :) Kororaa Project							--
+#--										--
+#-- Kororaa Keymaps Configurator - Bash Version					--
+#-- Created by Matthew Oliver, Christopher Smart				--
+#--										--
+#-- Date: 21st July 2006							--
+#-- Version: 0.2								--
+#-- Licence: GPL2								--
+#--										--
+#-- Program: choosekeymaps							--
+#-- Usage: "choosekeymaps"							--
+#-- Purpose: Dialog based script to setup keyboard languages in console and X	--
+#---------------------------------------------------------------------------------
+#    This program is free software; you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation; either version 2 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program; if not, write to the Free Software
+#    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+#
+#---------------------------------------------------------------------------------
+#
+# History #
+#-----------------------------------------------------------------------
+# v0.2.1 - 31/01/2007
+#	* Modified for use in Lincade System
+#	* Language Enabled
+#	* Original Source commented out
+#	* Version aquired from http://kororaa.org/files/tools/choosekeymap
+# v0.2 - 21/07/2006
+#	* Updated scipt to use replaceLine tool and libkororaa library
+# v0.1 - 13/11/2005
+#       * Released with Kororaa Beta2
+#-----------------------------------------------------------------------
+
+#Keymap test
+
+#source libraries
+source "/usr/bin/libkororaa"
+
+### Lincade Changed
+DIALOG=${DIALOG:-dialog}
+
+
+language=`cat /home/mame/.lincade/.language`
+language=${language:-2}
+	case $language in
+		1)	#German Menu Text
+			choose_key_map="Keymap Selection"
+			key_maps="Keymaps"
+			key_maps_selection="Select your keymap"
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+		;;
+		2)	#English Menu Text
+			choose_key_map="Keymap Selection"
+			key_maps="Keymaps"
+			key_maps_selection="Select your keymap"
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+		;;
+		3)	#French Menu Text
+			choose_key_map="Keymap Selection"
+			key_maps="Keymaps"
+			key_maps_selection="Select your keymap"
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+		;;
+		*)
+			choose_key_map="Keymap Selection"
+			key_maps="Keymaps"
+			key_maps_selection="Select your keymap"
+			root_required="You must be root to run this script."
+			permissions="Permissions Error"
+		;;
+	esac
+
+### Lincade Changed
+#checkKororaaFolder
+
+#Global Variables
+consoleKeymapConf="/etc/conf.d/keymaps"
+### Lincade Changed
+#saveXKeymapLocation="$KORORAA_ETC/xkeymap"
+### Lincade Changed
+#saveCKeymapLocation="$KORORAA_ETC/ckeymap"
+### Lincade Changed
+#TITLE="Kororaa - Keymap Selection"
+TITLE="Lincade Borrowed - Kororaa - $choose_key_map"
+
+REPLACE_LINES="/usr/bin/replaceLines"
+
+
+function keymaps()
+{
+	#keymaps=(`cat $keymapfile |grep -v "##" |sed 's/ /-/g' |awk -F '[\t]*' '{print $1}' |sort |uniq`)
+	keymaps=(`ls /usr/share/keymaps/i386/ -R |grep ".map" |grep -v ":" |sed "s/.map.gz//g" |sort |uniq`)
+
+	numkeymaps=${#keymaps[*]}
+	i=0
+	radiolist=""
+
+	while [ $i -lt $numkeymaps ]
+	do
+		if [ "${keymaps[$i]}" == "us" ]
+		then
+			radiolist="$radiolist \"`echo "${keymaps[$i]}" |sed 's/-/ /g' `\" \"\" on"
+		else
+			radiolist="$radiolist \"`echo "${keymaps[$i]}" |sed 's/-/ /g' `\" \"\" off"
+		fi
+
+		let "i+=1"
+	done
+
+### Lincade Changed
+	#echo "$radiolist" |xargs dialog --backtitle "$TITLE" --title "Keymaps" --radiolist "Select your keymap:" 20 40 13 2> result.res
+	echo "$radiolist" |xargs $DIALOG --backtitle "$TITLE" --title "Keymaps" --radiolist "Select your keymap:" 20 40 13 2> result.res
+
+	if [ "$?" != "0" ]
+	then
+		if [ -e result.res ]
+		then
+			rm -f result.res
+		fi
+
+		keymaps
+	else
+		#chosen a keymap
+		#cat result.res ; read
+### Lincade Changed
+		#result="`cat result.res`"
+		result="$(awk '{ field = $NF }; END{ print field }' result.res)"
+		rm -f result.res
+
+		#add keymap to console
+		conssoleMap="$result"
+		newLine="KEYMAP=\"$conssoleMap\""
+		check_replace_append "KEYMAP=" "$newLine" "$consoleKeymapConf" "" 0 "#"
+
+### Lincade Changed
+		#echo "$newLine" > $saveCKeymapLocation
+
+		loadkeys $conssoleMap > /dev/null 2> /dev/null
+
+		#Plave the xkeymap file for X in a location to be picked up by genstall
+		#xmap="`cat $keymapfile |grep "$result" |awk -F '[\t]*' '{print $3}'`"
+### Lincade Changed
+		#echo "Option \"XkbLayout\" \"$conssoleMap\"" > $saveXKeymapLocation
+		
+		if [ -e /etc/X11/xorg.conf ]
+		then
+			if [ -z "`cat /etc/X11/xorg.conf |grep "XkbLayout"`" ]
+			then
+				newlines=( `cat /etc/X11/xorg.conf |grep "Identifier" |grep "Keyboard" |sed 's/[ ]/|%|/g' |sed 's/\t/|_|/g'`)
+				for x in ${newlines[*]}
+				do
+					newline="`echo "$x" |sed 's/|%|/ /g' |sed 's/|_|/\t/g'`"
+					$REPLACE_LINES -s "$newline" -n "$newline \n\tOption \"XkbLayout\" \"$conssoleMap\"" -i "/etc/X11/xorg.conf" -c "#"
+				done
+			else
+				$REPLACE_LINES -s "XkbLayout" -n "\tOption \"XkbLayout\" \"$conssoleMap\"" -i "/etc/X11/xorg.conf" -c "#"
+			fi
+		fi
+	fi
+}	
+
+#Main Part
+#export LC_ALL="en_AU.UTF-8"
+#export LANG="en_AU.UTF-8"
+checkUser 
+
+if [ "$?" == "1" ]
+then
+	#error
+### Lincade Changed
+	#dialog --backtitle "$TITLE" --title "Permissions Error" \
+	#	--msgbox "You must be root to run this script." 10 60
+	$DIALOG --backtitle "$TITLE" --title "$permissions" \
+		--msgbox "$root_required" 10 60
+	clear
+	exit 1
+fi
+
+keymaps
+clear
